@@ -42,6 +42,10 @@ export class TipSchedulerService {
     const all = await this.workers.all();
     for (const worker of all) {
       if (!worker.onboarded) continue;
+      if (!worker.lastVerifiedInboundAt) {
+        this.logger.warn('skipped daily tip for a recipient without verified inbound consent');
+        continue;
+      }
       if (worker.lastTipDate === today) continue;
       if (!this.isDue(worker, now)) continue;
       if (!this.timeMatches(worker.tipTime, hhmm)) continue;
@@ -55,7 +59,11 @@ export class TipSchedulerService {
     if (!tip) return;
 
     const messages = this.buildTipMessages(worker, tip);
-    await this.whatsapp.sendMany(worker.userId, messages);
+    const sent = await this.whatsapp.sendMany(worker.userId, messages);
+    if (!sent) {
+      this.logger.error(`daily tip ${tip.id} was not sent; delivery state was left unchanged`);
+      return;
+    }
 
     await this.personalization.logDelivery(worker.userId, tip.id);
     worker.lastTipDate = today;

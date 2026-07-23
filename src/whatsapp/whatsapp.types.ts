@@ -8,8 +8,10 @@ export type WhatsAppOutbound =
 
 /** A normalized inbound message after we flatten Meta's webhook envelope. */
 export interface NormalizedInbound {
-  /** Worker's phone / wa id, also the conversation thread id. */
+  /** Sender's canonical WhatsApp ID, also the conversation thread id. */
   phone: string;
+  /** Meta phone-number ID that received the message. */
+  businessPhoneNumberId?: string;
   /** Free text; for audio this is the transcript (or '' if unavailable). */
   text: string;
   /** Interactive reply id (button/list selection), if any. */

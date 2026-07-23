@@ -20,9 +20,14 @@ export class WorkerService {
         language: 'en',
         onboarded: false,
         onboardingStep: 'start',
+        lastVerifiedInboundAt: new Date(),
       });
-      await this.workers.save(worker);
+    } else {
+      // This service is reached only after the webhook signature and business
+      // phone-number checks in WhatsAppController have passed.
+      worker.lastVerifiedInboundAt = new Date();
     }
+    await this.workers.save(worker);
     return worker;
   }
 

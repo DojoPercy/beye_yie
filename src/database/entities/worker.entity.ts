@@ -38,6 +38,13 @@ export class Worker {
   @Column({ type: 'boolean', default: false })
   onboarded: boolean;
 
+  /**
+   * Set only after Meta-signed inbound traffic for this exact WhatsApp ID.
+   * Proactive messages must never start from an unverified stored recipient.
+   */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastVerifiedInboundAt: Date | null;
+
   /** Which daily-tip sequence index they last received (rotates the 9 tips). */
   @Column({ type: 'int', default: 0 })
   tipCursor: number;

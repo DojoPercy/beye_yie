@@ -76,11 +76,27 @@ added end-to-end testing). Inspect impact at:
 |-----|---------|
 | `DATABASE_URL` | Postgres (conversation log, users, event log, pg-boss) |
 | `LLM_PROVIDER` / `*_API_KEY` | `OPENAI` \| `OPENROUTER` \| `GOOGLE` for the grounded agent + red-flag backstop |
-| `META_WHATSAPP_TOKEN` / `META_PHONE_NUMBER_ID` | Meta Cloud API send (omit → dry-run) |
+| `META_WHATSAPP_TOKEN` / `META_PHONE_NUMBER_ID` / `META_APP_SECRET` | Meta Cloud API send and signed webhook verification (omit token → dry-run) |
 | `META_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake |
 | `VOICE_NOTE_TRANSCRIPTION_ENABLED` | Voice-in (**off by default** — Twi ASR is unreliable, plan §06) |
 | `OT_HANDOFF_NAME` / `OT_HANDOFF_CONTACT` | The **real** OT/clinic/GHS contact for Layer ③ |
 | `AUDIO_BASE_URL` | Public base URL for recorded tip audio (optional) |
+
+### WhatsApp number isolation
+
+Set `META_PHONE_NUMBER_ID` to the **Phone Number ID** for this bot in Meta,
+not its visible telephone number. The webhook now rejects messages that Meta
+reports as addressed to another business number in the same WhatsApp Business
+Account, preventing this deployment from replying in that number's chats.
+Outbound recipients are also validated as canonical WhatsApp IDs before a
+message is sent. Set `META_APP_SECRET` from Meta App Dashboard as well: live
+webhook events must have a valid `X-Hub-Signature-256` signature before their
+sender ID is trusted.
+
+For an extra safety check, scheduled tips and check-ins only go to a worker
+after that exact WhatsApp ID has sent a verified message to this bot. Existing
+records are therefore paused until their owner messages the bot once after this
+release.
 
 ## What the team still owns (not code)
 

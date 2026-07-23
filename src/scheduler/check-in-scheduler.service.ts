@@ -37,8 +37,13 @@ export class CheckInSchedulerService {
     const all = await this.workers.all();
     for (const worker of all) {
       if (!worker.onboarded) continue;
-      await this.whatsapp.sendMany(worker.userId, [this.buildCheckIn(worker)]);
-      this.logger.log(`weekly check-in → ${worker.userId}`);
+      if (!worker.lastVerifiedInboundAt) {
+        this.logger.warn('skipped weekly check-in for a recipient without verified inbound consent');
+        continue;
+      }
+      const sent = await this.whatsapp.sendMany(worker.userId, [this.buildCheckIn(worker)]);
+      if (sent) this.logger.log(`weekly check-in → ${worker.userId}`);
+      else this.logger.error('weekly check-in was not sent');
     }
   }
 

@@ -17,6 +17,7 @@ export interface AppConfig {
   whatsapp: {
     token?: string;
     phoneNumberId?: string;
+    appSecret?: string;
     verifyToken: string;
     sendTimeoutMs: number;
   };
@@ -55,6 +56,7 @@ export default (): AppConfig => ({
   whatsapp: {
     token: process.env.META_WHATSAPP_TOKEN,
     phoneNumberId: process.env.META_PHONE_NUMBER_ID,
+    appSecret: process.env.META_APP_SECRET,
     verifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN || 'beye-yie-verify',
     sendTimeoutMs: Number(process.env.WHATSAPP_SEND_TIMEOUT_MS || 8000),
   },

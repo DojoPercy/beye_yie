@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpCode, Logger, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Logger, Post, Query, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { PgBossService } from '../messaging/pg-boss.service';
 import { INBOUND_QUEUE } from '../messaging/queues';
 import { WhatsAppService } from './whatsapp.service';
@@ -36,9 +36,20 @@ export class WhatsAppController {
 
   @Post()
   @HttpCode(200)
-  async receive(@Body() body: any): Promise<{ ok: true }> {
-    const inbound = this.whatsapp.normalizeInbound(body);
-    if (inbound) {
+  async receive(
+    @Body() body: any,
+    @Headers('x-hub-signature-256') signature: string | undefined,
+    @Req() request: Request & { rawBody?: Buffer },
+  ): Promise<{ ok: true }> {
+    if (!this.whatsapp.isWebhookSignatureValid(request.rawBody, signature)) {
+      this.logger.warn('rejected webhook with an invalid Meta signature');
+      throw new UnauthorizedException();
+    }
+    for (const inbound of this.whatsapp.normalizeInbounds(body)) {
+      if (!this.whatsapp.isInboundForConfiguredNumber(inbound)) {
+        this.logger.warn('ignored webhook event for a different WhatsApp business number');
+        continue;
+      }
       this.logger.debug(`inbound from ${inbound.phone}: "${inbound.text || inbound.replyId || '[audio]'}"`);
       await this.boss.send(INBOUND_QUEUE, inbound);
     }

@@ -1,8 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { NormalizedInbound, WhatsAppOutbound } from './whatsapp.types';
 
 const GRAPH = 'https://graph.facebook.com/v19.0';
+const WHATSAPP_ID = /^[1-9]\d{6,14}$/;
+
+/**
+ * Meta expects a WhatsApp ID (digits only, country code included), never a
+ * display-formatted telephone number. Keep this conversion in one place so a
+ * stored value can never accidentally change the recipient of a send.
+ */
+export function normalizeWhatsAppId(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(/[\s()+-]/g, '');
+  return WHATSAPP_ID.test(normalized) ? normalized : null;
+}
 
 /**
  * Meta WhatsApp Cloud API client. Sends the message shapes the bot uses and
@@ -21,12 +34,18 @@ export class WhatsAppService {
   private get phoneNumberId() {
     return this.config.get<string>('whatsapp.phoneNumberId');
   }
+  private get appSecret() {
+    return this.config.get<string>('whatsapp.appSecret');
+  }
   private get timeoutMs() {
     return this.config.get<number>('whatsapp.sendTimeoutMs') ?? 8000;
   }
 
-  async sendMany(to: string, messages: WhatsAppOutbound[]): Promise<void> {
-    for (const m of messages) await this.send(to, m);
+  async sendMany(to: string, messages: WhatsAppOutbound[]): Promise<boolean> {
+    for (const m of messages) {
+      if (!(await this.send(to, m))) return false;
+    }
+    return true;
   }
 
   /**
@@ -55,12 +74,18 @@ export class WhatsAppService {
     }
   }
 
-  async send(to: string, message: WhatsAppOutbound): Promise<void> {
-    const payload = this.buildPayload(to, message);
+  async send(to: string, message: WhatsAppOutbound): Promise<boolean> {
+    const recipient = normalizeWhatsAppId(to);
+    if (!recipient) {
+      this.logger.error('blocked outbound message: recipient is not a valid WhatsApp ID');
+      return false;
+    }
+
+    const payload = this.buildPayload(recipient, message);
     if (!this.token || !this.phoneNumberId) {
       // Demo / offline mode: log instead of hitting Meta.
-      this.logger.warn(`[dry-run → ${to}] ${JSON.stringify(payload.body ?? payload)}`);
-      return;
+      this.logger.warn(`[dry-run → ${this.maskId(recipient)}] ${JSON.stringify(payload.body ?? payload)}`);
+      return true;
     }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
@@ -75,10 +100,13 @@ export class WhatsAppService {
         signal: controller.signal,
       });
       if (!res.ok) {
-        this.logger.error(`send failed ${res.status}: ${await res.text()}`);
+        this.logger.error(`send failed to ${this.maskId(recipient)} (${res.status}): ${await res.text()}`);
+        return false;
       }
+      return true;
     } catch (err) {
-      this.logger.error(`send error to ${to}: ${(err as Error).message}`);
+      this.logger.error(`send error to ${this.maskId(recipient)}: ${(err as Error).message}`);
+      return false;
     } finally {
       clearTimeout(timer);
     }
@@ -148,16 +176,66 @@ export class WhatsAppService {
     }
   }
 
-  /** Flatten Meta's nested webhook envelope into a NormalizedInbound. */
+  /**
+   * True only when this webhook event was addressed to this deployment's
+   * configured WhatsApp business number. A WABA can contain multiple phone
+   * numbers; without this check a webhook subscription for one can make this
+   * bot answer conversations belonging to another.
+   */
+  isInboundForConfiguredNumber(inbound: NormalizedInbound): boolean {
+    const configured = normalizeWhatsAppId(this.phoneNumberId);
+    if (!configured) return true; // Offline mode has no business number to scope to.
+    return inbound.businessPhoneNumberId === configured;
+  }
+
+  /** Verify that a webhook was sent by Meta before trusting its `from` field. */
+  isWebhookSignatureValid(rawBody: Buffer | undefined, signature: string | undefined): boolean {
+    // In offline mode no external message can be sent, so local webhook samples
+    // remain convenient. A live sender must always have an app secret.
+    if (!this.appSecret) return !this.token;
+    if (!rawBody || !signature) return false;
+
+    const expected = `sha256=${createHmac('sha256', this.appSecret).update(rawBody).digest('hex')}`;
+    const actual = Buffer.from(signature, 'utf8');
+    const expectedBuffer = Buffer.from(expected, 'utf8');
+    return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
+  }
+
+  /** Flatten all Meta webhook messages into normalized inbound events. */
+  normalizeInbounds(body: any): NormalizedInbound[] {
+    const inbounds: NormalizedInbound[] = [];
+    for (const entry of body?.entry ?? []) {
+      for (const change of entry?.changes ?? []) {
+        const value = change?.value;
+        const businessPhoneNumberId = normalizeWhatsAppId(value?.metadata?.phone_number_id) ?? undefined;
+        const contacts = value?.contacts ?? [];
+        for (const msg of value?.messages ?? []) {
+          const phone = normalizeWhatsAppId(msg?.from);
+          if (!phone || !msg?.id) {
+            this.logger.warn('ignoring inbound event with an invalid WhatsApp sender or message ID');
+            continue;
+          }
+          const profileName = contacts.find((contact: any) => contact?.wa_id === msg.from)?.profile?.name;
+          const normalized = this.normalizeMessage(msg, phone, msg.id, profileName, businessPhoneNumberId);
+          inbounds.push(normalized);
+        }
+      }
+    }
+    return inbounds;
+  }
+
+  /** Backwards-compatible helper for callers that only need the first event. */
   normalizeInbound(body: any): NormalizedInbound | null {
-    const value = body?.entry?.[0]?.changes?.[0]?.value;
-    const msg = value?.messages?.[0];
-    if (!msg) return null;
+    return this.normalizeInbounds(body)[0] ?? null;
+  }
 
-    const phone: string = msg.from;
-    const messageId: string = msg.id;
-    const profileName: string | undefined = value?.contacts?.[0]?.profile?.name;
-
+  private normalizeMessage(
+    msg: any,
+    phone: string,
+    messageId: string,
+    profileName: string | undefined,
+    businessPhoneNumberId: string | undefined,
+  ): NormalizedInbound {
     // Interactive replies (buttons / list)
     if (msg.type === 'interactive') {
       const reply = msg.interactive?.button_reply ?? msg.interactive?.list_reply;
@@ -165,20 +243,25 @@ export class WhatsAppService {
         phone,
         messageId,
         profileName,
+        businessPhoneNumberId,
         replyId: reply?.id,
         text: reply?.title ?? '',
       };
     }
     if (msg.type === 'button') {
-      return { phone, messageId, profileName, replyId: msg.button?.payload, text: msg.button?.text ?? '' };
+      return { phone, messageId, profileName, businessPhoneNumberId, replyId: msg.button?.payload, text: msg.button?.text ?? '' };
     }
     if (msg.type === 'audio') {
-      return { phone, messageId, profileName, audioMediaId: msg.audio?.id, text: '' };
+      return { phone, messageId, profileName, businessPhoneNumberId, audioMediaId: msg.audio?.id, text: '' };
     }
     if (msg.type === 'text') {
-      return { phone, messageId, profileName, text: msg.text?.body ?? '' };
+      return { phone, messageId, profileName, businessPhoneNumberId, text: msg.text?.body ?? '' };
     }
     // Unsupported types (image, location, …) — treat as empty text.
-    return { phone, messageId, profileName, text: '' };
+    return { phone, messageId, profileName, businessPhoneNumberId, text: '' };
+  }
+
+  private maskId(value: string): string {
+    return value.length <= 4 ? '****' : `${'*'.repeat(value.length - 4)}${value.slice(-4)}`;
   }
 }
