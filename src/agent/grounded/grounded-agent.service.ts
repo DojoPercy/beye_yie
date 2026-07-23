@@ -63,17 +63,50 @@ export class GroundedAgentService {
       // Enough headroom for a 2–4 sentence reply plus the closing disclaimer.
       const model = createChatModel(llm, { temperature: 0.3, maxTokens: 500 });
       const history = await this.recentHistory(worker.userId);
-      const res = await model.invoke([
+      const prompt = [
         new SystemMessage(buildGroundedPrompt(worker, topics, recallLine)),
         ...history,
         new HumanMessage(message),
-      ]);
-      const reply = typeof res.content === 'string' ? res.content : JSON.stringify(res.content);
-      return { reply: reply.trim(), matchedTipId };
+      ];
+
+      // Guard against truncated output: on a constrained host an interrupted
+      // request can return half-generated text. A complete reply always carries
+      // its closing disclaimer — if it doesn't, retry once, then fall back to
+      // safe template text. A worker must NEVER receive a sentence cut mid-word.
+      let reply = await this.invokeText(model, prompt);
+      if (!this.looksComplete(reply, worker.language)) {
+        this.logger.warn('grounded reply looked truncated — retrying once');
+        reply = await this.invokeText(model, prompt);
+      }
+      if (!this.looksComplete(reply, worker.language)) {
+        this.logger.warn('grounded reply still truncated — using safe fallback');
+        return { reply: fallbackReply(topics, worker.language), matchedTipId };
+      }
+      return { reply, matchedTipId };
     } catch (err) {
       this.logger.error(`grounded agent error: ${(err as Error).message}`);
       return { reply: fallbackReply(topics, worker.language), matchedTipId };
     }
+  }
+
+  private async invokeText(
+    model: ReturnType<typeof createChatModel>,
+    prompt: (SystemMessage | HumanMessage | AIMessage)[],
+  ): Promise<string> {
+    const res = await model.invoke(prompt);
+    const content = typeof res.content === 'string' ? res.content : JSON.stringify(res.content);
+    return content.trim();
+  }
+
+  /**
+   * A complete grounded reply always ends with its closing disclaimer (the
+   * prompt mandates it). If the disclaimer marker is missing, the reply was
+   * cut off before finishing.
+   */
+  private looksComplete(reply: string, language: 'tw' | 'en'): boolean {
+    if (!reply) return false;
+    const marker = language === 'tw' ? 'ayaresa' : 'medical treatment';
+    return reply.toLowerCase().includes(marker.toLowerCase());
   }
 
   /** Last few turns as chat messages, for lightweight conversational memory. */
