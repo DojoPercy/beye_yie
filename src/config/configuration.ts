@@ -31,6 +31,10 @@ export interface AppConfig {
   };
   scheduler: {
     tickMinutes: number;
+    /** Layer ① daily-tip push. Off until Meta approves the utility templates. */
+    tipsEnabled: boolean;
+    /** Weekly proactive check-in. Also template-gated. */
+    checkInsEnabled: boolean;
   };
 }
 
@@ -68,5 +72,8 @@ export default (): AppConfig => ({
   },
   scheduler: {
     tickMinutes: Number(process.env.TIP_SCHEDULER_TICK_MINUTES || 5),
+    // Default OFF: proactive messages need approved WhatsApp templates.
+    tipsEnabled: process.env.TIP_SCHEDULER_ENABLED === 'true',
+    checkInsEnabled: process.env.WEEKLY_CHECKIN_ENABLED === 'true',
   },
 });

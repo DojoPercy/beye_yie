@@ -1,0 +1,45 @@
+# Render Blueprint. Import via Render → New → Blueprint (or set the same
+# Build/Start commands manually in the service settings).
+#
+# The key fix: Start Command runs the PRE-COMPILED JS (node dist/main.js),
+# never `nest start` — compiling at runtime OOMs Render's small instances.
+
+databases:
+  - name: beye-yie-db
+    plan: free
+    databaseName: beye_yie
+    user: beye_yie
+
+services:
+  - type: web
+    name: beye-yie
+    runtime: node
+    plan: starter
+    # --include=dev forces devDependencies (nest cli + typescript) to install
+    # for the build even though NODE_ENV=production would otherwise omit them.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/main.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: beye-yie-db
+          property: connectionString
+      # ── secrets: set these in the Render dashboard (sync:false = not in git) ──
+      - key: META_WHATSAPP_TOKEN
+        sync: false
+      - key: META_PHONE_NUMBER_ID
+        sync: false
+      - key: META_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: LLM_PROVIDER
+        value: OPENAI
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OT_HANDOFF_NAME
+        sync: false
+      - key: OT_HANDOFF_CONTACT
+        sync: false

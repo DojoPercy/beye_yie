@@ -5,6 +5,7 @@ import { PainEvent } from './pain-event.entity';
 import { RedFlagReferral } from './red-flag-referral.entity';
 import { TipDelivery } from './tip-delivery.entity';
 import { ConversationTurn } from './conversation-turn.entity';
+import { ProcessedMessage } from './processed-message.entity';
 
 export const ENTITIES = [
   Worker,
@@ -14,6 +15,7 @@ export const ENTITIES = [
   RedFlagReferral,
   TipDelivery,
   ConversationTurn,
+  ProcessedMessage,
 ];
 
 export {
@@ -24,4 +26,5 @@ export {
   RedFlagReferral,
   TipDelivery,
   ConversationTurn,
+  ProcessedMessage,
 };

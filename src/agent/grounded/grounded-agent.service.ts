@@ -60,7 +60,8 @@ export class GroundedAgentService {
     }
 
     try {
-      const model = createChatModel(llm, { temperature: 0.3, maxTokens: 300 });
+      // Enough headroom for a 2–4 sentence reply plus the closing disclaimer.
+      const model = createChatModel(llm, { temperature: 0.3, maxTokens: 500 });
       const history = await this.recentHistory(worker.userId);
       const res = await model.invoke([
         new SystemMessage(buildGroundedPrompt(worker, topics, recallLine)),

@@ -32,6 +32,9 @@ export class TipSchedulerService {
   /** Sweeps every 5 minutes; each worker fires once at their tip_time. */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sweep(): Promise<void> {
+    // Gated: proactive daily tips need approved WhatsApp utility templates.
+    if (!this.config.get<boolean>('scheduler.tipsEnabled')) return;
+
     const now = new Date();
     const hhmm = now.toISOString().slice(11, 16); // UTC == Africa/Accra
     const today = now.toISOString().slice(0, 10);

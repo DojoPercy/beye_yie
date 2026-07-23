@@ -29,6 +29,32 @@ export class WhatsAppService {
     for (const m of messages) await this.send(to, m);
   }
 
+  /**
+   * Mark an inbound message as read and show the typing indicator. Meta clears
+   * the indicator automatically when we send our reply (or after ~25s). Best
+   * effort — never throws, never blocks the pipeline.
+   */
+  async markReadAndTyping(messageId: string): Promise<void> {
+    if (!this.token || !this.phoneNumberId || !messageId) return;
+    try {
+      await fetch(`${GRAPH}/${this.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          status: 'read',
+          message_id: messageId,
+          typing_indicator: { type: 'text' },
+        }),
+      });
+    } catch (err) {
+      this.logger.warn(`markReadAndTyping failed: ${(err as Error).message}`);
+    }
+  }
+
   async send(to: string, message: WhatsAppOutbound): Promise<void> {
     const payload = this.buildPayload(to, message);
     if (!this.token || !this.phoneNumberId) {

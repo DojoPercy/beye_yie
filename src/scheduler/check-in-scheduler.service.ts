@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
 import { Worker, Category } from '../database/entities/worker.entity';
 import { WorkerService } from '../agent/worker/worker.service';
@@ -22,6 +23,7 @@ export class CheckInSchedulerService {
   private readonly logger = new Logger(CheckInSchedulerService.name);
 
   constructor(
+    private readonly config: ConfigService,
     private readonly workers: WorkerService,
     private readonly whatsapp: WhatsAppService,
   ) {}
@@ -29,6 +31,9 @@ export class CheckInSchedulerService {
   /** Mondays at 09:00 UTC (≈ Accra). */
   @Cron('0 9 * * 1')
   async weekly(): Promise<void> {
+    // Gated: proactive check-ins need approved WhatsApp templates.
+    if (!this.config.get<boolean>('scheduler.checkInsEnabled')) return;
+
     const all = await this.workers.all();
     for (const worker of all) {
       if (!worker.onboarded) continue;

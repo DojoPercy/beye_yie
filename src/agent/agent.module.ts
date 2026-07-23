@@ -5,6 +5,7 @@ import {
   CheckIn,
   ConversationTurn,
   PainEvent,
+  ProcessedMessage,
   RedFlagReferral,
   Tip,
   TipDelivery,
@@ -32,6 +33,7 @@ import { InboundProcessor } from './inbound.processor';
       RedFlagReferral,
       TipDelivery,
       ConversationTurn,
+      ProcessedMessage,
     ]),
   ],
   providers: [
