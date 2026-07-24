@@ -1,7 +1,10 @@
 /** Outbound message shapes the sender understands. */
 export type WhatsAppOutbound =
   | { type: 'text'; body: string }
-  | { type: 'audio'; link: string }
+  /** Use a Meta-hosted immutable asset when available; a public HTTPS link is
+   * retained for local/staging use. Exactly one source must be provided. */
+  | { type: 'audio'; mediaId: string; link?: never }
+  | { type: 'audio'; link: string; mediaId?: never }
   | { type: 'buttons'; body: string; buttons: { id: string; title: string }[] }
   | { type: 'list'; body: string; button: string; rows: { id: string; title: string; description?: string }[] }
   | { type: 'template'; name: string; language: string; bodyParams?: string[] };

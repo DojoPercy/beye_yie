@@ -2,6 +2,14 @@ import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } fro
 
 export type Language = 'tw' | 'en';
 export type Category = 'load' | 'hand' | 'sitting';
+/** The main market-work task a worker says puts the most strain on her body. */
+export type WorkActivity =
+  | 'carrying'
+  | 'head_loading'
+  | 'standing_walking'
+  | 'bending_squatting'
+  | 'repetitive_hand_work'
+  | 'sitting_leaning';
 export type Frequency = 'daily' | 'alternate' | 'weekly';
 
 /**
@@ -23,6 +31,13 @@ export class Worker {
 
   @Column({ type: 'varchar', length: 16, nullable: true })
   category: Category | null;
+
+  /**
+   * Kept separately from `category`: one market woman may do several jobs,
+   * while this captures the activity most likely to need OT guidance.
+   */
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  workActivity: WorkActivity | null;
 
   /** Preferred daily-tip send time, "HH:mm" 24h, worker's local (Africa/Accra). */
   @Column({ type: 'varchar', length: 5, default: '06:30' })

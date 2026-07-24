@@ -62,7 +62,19 @@ check('keeps the matching contact name with its sender', inbounds[0]?.profileNam
 check('accepts events for this configured business number', service.isInboundForConfiguredNumber(inbounds[0]));
 check('rejects events for another business number', !service.isInboundForConfiguredNumber(inbounds[1]));
 
-console.log('\n[3] Meta webhook authentication:');
+console.log('\n[3] Audio payloads:');
+const metaAudioPayload = (service as any).buildPayload('233201234567', {
+  type: 'audio',
+  mediaId: 'meta-media-id',
+});
+const linkedAudioPayload = (service as any).buildPayload('233201234567', {
+  type: 'audio',
+  link: 'https://cdn.example.com/welcome.ogg',
+});
+check('uses a Meta media ID for a pre-uploaded audio asset', metaAudioPayload.audio?.id === 'meta-media-id');
+check('uses a public link only when no Meta media ID is supplied', linkedAudioPayload.audio?.link === 'https://cdn.example.com/welcome.ogg');
+
+console.log('\n[4] Meta webhook authentication:');
 const rawBody = Buffer.from(JSON.stringify(payload));
 const signature = `sha256=${createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;
 check('accepts a valid Meta signature', service.isWebhookSignatureValid(rawBody, signature));

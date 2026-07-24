@@ -10,9 +10,13 @@ RUN npm run build
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/public ./public
 EXPOSE 3005
 # Run the pre-compiled entrypoint — NOT `nest start`.
 CMD ["node", "dist/main.js"]

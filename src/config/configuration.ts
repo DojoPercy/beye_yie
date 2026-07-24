@@ -26,6 +26,20 @@ export interface AppConfig {
     provider: 'openai' | 'groq';
     groqKey?: string;
   };
+  abenaTts: {
+    enabled: boolean;
+    apiKey?: string;
+    defaultVoice: string;
+    publicBaseUrl?: string;
+  };
+  /**
+   * Immutable, pre-rendered onboarding clips. Prefer Meta media IDs: the
+   * welcome flow then has no TTS call, public URL, or per-worker cost.
+   */
+  welcomeAudio: {
+    en?: { mediaId?: string; link?: string };
+    tw?: { mediaId?: string; link?: string };
+  };
   handoff: {
     name: string;
     contact: string;
@@ -67,6 +81,22 @@ export default (): AppConfig => ({
         ? 'groq'
         : 'openai',
     groqKey: process.env.GROQ_API_KEY,
+  },
+  abenaTts: {
+    enabled: process.env.ABENA_TTS_ENABLED === 'true',
+    apiKey: process.env.ABENA_TTS_API_KEY,
+    defaultVoice: process.env.ABENA_TTS_DEFAULT_VOICE || 'abena_twi_high',
+    publicBaseUrl: process.env.PUBLIC_BASE_URL,
+  },
+  welcomeAudio: {
+    en: {
+      mediaId: process.env.WELCOME_AUDIO_EN_MEDIA_ID,
+      link: process.env.WELCOME_AUDIO_EN_URL,
+    },
+    tw: {
+      mediaId: process.env.WELCOME_AUDIO_TW_MEDIA_ID,
+      link: process.env.WELCOME_AUDIO_TW_URL,
+    },
   },
   handoff: {
     name: process.env.OT_HANDOFF_NAME || 'Ghana Health Service',

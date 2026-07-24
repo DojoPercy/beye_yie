@@ -25,7 +25,7 @@ Every inbound message flows through `PipelineService`:
 0. resolve worker (+ transcribe voice, English-biased)
 1. RED-FLAG SAFETY GATE   → escalate + STOP   (BEFORE any advice)
 2. special replies         (CALL callback, weekly check-in)
-3. onboarding quiz         (name → language → category → tip time)
+3. onboarding quiz         (language → optional welcome audio → name → work activity → tip time)
 4. grounded on-demand agent
 ```
 
@@ -80,7 +80,9 @@ added end-to-end testing). Inspect impact at:
 | `META_WEBHOOK_VERIFY_TOKEN` | Webhook subscription handshake |
 | `VOICE_NOTE_TRANSCRIPTION_ENABLED` | Voice-in (**off by default** — Twi ASR is unreliable, plan §06) |
 | `OT_HANDOFF_NAME` / `OT_HANDOFF_CONTACT` | The **real** OT/clinic/GHS contact for Layer ③ |
-| `AUDIO_BASE_URL` | Public base URL for recorded tip audio (optional) |
+| `PUBLIC_BASE_URL` | Public base URL for locally generated audio (development only) |
+| `WELCOME_AUDIO_{TW,EN}_MEDIA_ID` | Pre-uploaded Meta media IDs for the two reviewed welcome clips (recommended) |
+| `WELCOME_AUDIO_{TW,EN}_URL` | HTTPS links for the welcome clips (development/staging fallback) |
 
 ### WhatsApp number isolation
 

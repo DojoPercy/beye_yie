@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
-import { Worker, Category } from '../database/entities/worker.entity';
+import { Worker, Category, WorkActivity } from '../database/entities/worker.entity';
 import { WorkerService } from '../agent/worker/worker.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { WhatsAppOutbound } from '../whatsapp/whatsapp.types';
@@ -11,6 +11,16 @@ const BODY_PART: Record<Category, string> = {
   load: 'back',
   hand: 'wrist',
   sitting: 'neck',
+};
+
+/** A more specific check-in when the worker chose a main market-work activity. */
+const BODY_PART_BY_ACTIVITY: Record<WorkActivity, string> = {
+  carrying: 'back',
+  head_loading: 'neck',
+  standing_walking: 'legs and feet',
+  bending_squatting: 'knees and back',
+  repetitive_hand_work: 'wrist and hand',
+  sitting_leaning: 'lower back and neck',
 };
 
 /**
@@ -48,7 +58,10 @@ export class CheckInSchedulerService {
   }
 
   private buildCheckIn(worker: Worker): WhatsAppOutbound {
-    const part = BODY_PART[(worker.category ?? 'load') as Category];
+    const part = worker.workActivity
+      ? BODY_PART_BY_ACTIVITY[worker.workActivity]
+      : BODY_PART[(worker.category ?? 'load') as Category];
+    const partId = part.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
     const lang = worker.language;
     return {
       type: 'buttons',
@@ -57,9 +70,9 @@ export class CheckInSchedulerService {
           ? `Nnawɔtwe yi, wo ${part} ho te sɛn?`
           : `Quick check 🌿 How is your ${part} this week?`,
       buttons: [
-        { id: `checkin_${part}_worse`, title: lang === 'tw' ? 'Ɛkɔ so' : 'Worse' },
-        { id: `checkin_${part}_same`, title: lang === 'tw' ? 'Saa ara' : 'Same' },
-        { id: `checkin_${part}_better`, title: lang === 'tw' ? 'Ɛyɛ' : 'Better' },
+        { id: `checkin_${partId}_worse`, title: lang === 'tw' ? 'Ɛkɔ so' : 'Worse' },
+        { id: `checkin_${partId}_same`, title: lang === 'tw' ? 'Saa ara' : 'Same' },
+        { id: `checkin_${partId}_better`, title: lang === 'tw' ? 'Ɛyɛ' : 'Better' },
       ],
     };
   }

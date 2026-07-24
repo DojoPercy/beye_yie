@@ -70,9 +70,8 @@ export class GroundedAgentService {
       ];
 
       // Guard against truncated output: on a constrained host an interrupted
-      // request can return half-generated text. A complete reply always carries
-      // its closing disclaimer — if it doesn't, retry once, then fall back to
-      // safe template text. A worker must NEVER receive a sentence cut mid-word.
+      // request can return half-generated text. Replies no longer require a
+      // repeated disclaimer, so use a complete sentence ending as the check.
       let reply = await this.invokeText(model, prompt);
       if (!this.looksComplete(reply, worker.language)) {
         this.logger.warn('grounded reply looked truncated — retrying once');
@@ -99,14 +98,14 @@ export class GroundedAgentService {
   }
 
   /**
-   * A complete grounded reply always ends with its closing disclaimer (the
-   * prompt mandates it). If the disclaimer marker is missing, the reply was
-   * cut off before finishing.
+   * A complete reply has meaningful content and finishes a sentence. This
+   * catches the common interrupted-response case without forcing a boilerplate
+   * medical disclaimer into every WhatsApp message.
    */
-  private looksComplete(reply: string, language: 'tw' | 'en'): boolean {
-    if (!reply) return false;
-    const marker = language === 'tw' ? 'ayaresa' : 'medical treatment';
-    return reply.toLowerCase().includes(marker.toLowerCase());
+  private looksComplete(reply: string, _language: 'tw' | 'en'): boolean {
+    const trimmed = reply.trim();
+    // Allow ending with punctuation, emoji, or punctuation+emoji
+    return trimmed.length >= 12 && /[.!?…]["')\]]*\s*[\p{Emoji}\u200D\uFE0F]?$/u.test(trimmed);
   }
 
   /** Last few turns as chat messages, for lightweight conversational memory. */

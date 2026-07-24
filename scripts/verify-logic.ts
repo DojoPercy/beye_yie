@@ -6,6 +6,7 @@
 import { runRedFlagRules } from '../src/agent/safety/red-flag.rules';
 import { matchPhrase } from '../src/agent/knowledge/phrase-map';
 import { matchTopics } from '../src/agent/knowledge/knowledge-base';
+import { fallbackReply } from '../src/agent/grounded/prompts';
 
 let pass = 0;
 let fail = 0;
@@ -43,6 +44,22 @@ check('"metena fam daa" (Twi sit) → S2', matchPhrase('metena fam daa')?.tipId 
 console.log('\n[4] Knowledge retrieval (grounding):');
 check('back message retrieves a topic', matchTopics('my lower back hurts', 'load').length > 0);
 check('wrist message retrieves wrist-hand', matchTopics('my wrist and fingers tingle', 'hand').some((t) => t.id === 'wrist-hand'));
+
+console.log('\n[5] OTPF-informed market-work guidance:');
+check(
+  'repeated squatting retrieves work-modification guidance',
+  matchTopics('I squat to arrange goods on the floor all day', 'load').some((t) => t.id === 'bending-squatting-arranging-goods'),
+);
+check(
+  'long workdays retrieve pacing guidance',
+  matchTopics('I stand for long hours and need breaks', 'sitting').some((t) => t.id === 'work-pacing-and-breaks'),
+);
+
+console.log('\n[6] Natural, non-repeating safety language:');
+check(
+  'brief follow-up fallback does not append the stock disclaimer',
+  !fallbackReply([], 'en').toLowerCase().includes('medical treatment'),
+);
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed\n`);
 process.exit(fail === 0 ? 0 : 1);

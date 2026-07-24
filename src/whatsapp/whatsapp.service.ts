@@ -118,7 +118,11 @@ export class WhatsAppService {
       case 'text':
         return { ...base, type: 'text', text: { body: m.body, preview_url: false } };
       case 'audio':
-        return { ...base, type: 'audio', audio: { link: m.link } };
+        return {
+          ...base,
+          type: 'audio',
+          audio: 'mediaId' in m ? { id: m.mediaId } : { link: m.link },
+        };
       case 'buttons':
         return {
           ...base,
