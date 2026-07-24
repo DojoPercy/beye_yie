@@ -31,6 +31,16 @@ export class Tip {
   @Column({ type: 'varchar', nullable: true })
   audioTwUrl: string | null;
 
+  /**
+   * Meta-hosted, pre-generated audio. IDs are stored separately by language so
+   * a tip is synthesized and uploaded once, then reused for every worker.
+   */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  audioEnMediaId: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  audioTwMediaId: string | null;
+
   /** Meta-approved utility template name; null until approved (Phase 2). */
   @Column({ type: 'varchar', nullable: true })
   templateName: string | null;

@@ -21,6 +21,7 @@ import { PersonalizationService } from './personalization/personalization.servic
 import { GroundedAgentService } from './grounded/grounded-agent.service';
 import { PipelineService } from './pipeline.service';
 import { InboundProcessor } from './inbound.processor';
+import { TipVoiceOfferService } from './tips/tip-voice-offer.service';
 
 @Module({
   imports: [
@@ -43,9 +44,10 @@ import { InboundProcessor } from './inbound.processor';
     OnboardingService,
     PersonalizationService,
     GroundedAgentService,
+    TipVoiceOfferService,
     PipelineService,
     InboundProcessor,
   ],
-  exports: [WorkerService, PersonalizationService, EscalationService],
+  exports: [WorkerService, PersonalizationService, EscalationService, TipVoiceOfferService],
 })
 export class AgentModule {}

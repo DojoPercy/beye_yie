@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { basename } from 'path';
+import { readFile } from 'fs/promises';
 import { NormalizedInbound, WhatsAppOutbound } from './whatsapp.types';
 
 const GRAPH = 'https://graph.facebook.com/v19.0';
@@ -112,6 +114,47 @@ export class WhatsAppService {
     }
   }
 
+  /**
+   * Upload a reviewed OGG/Opus file once to Meta and return its durable media
+   * reference. The caller owns storing that ID against its fixed content.
+   */
+  async uploadAudioFile(filePath: string): Promise<string | null> {
+    if (!this.token || !this.phoneNumberId) {
+      this.logger.warn('cannot upload audio in dry-run mode: Meta token or phone-number ID is missing');
+      return null;
+    }
+
+    try {
+      const bytes = await readFile(filePath);
+      const form = new FormData();
+      form.set('messaging_product', 'whatsapp');
+      form.set(
+        'file',
+        new Blob([bytes], { type: 'audio/ogg; codecs=opus' }),
+        basename(filePath),
+      );
+
+      const response = await fetch(`${GRAPH}/${this.phoneNumberId}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.token}` },
+        body: form,
+      });
+      if (!response.ok) {
+        this.logger.error(`audio upload failed (${response.status}): ${await response.text()}`);
+        return null;
+      }
+      const data = (await response.json()) as { id?: string };
+      if (!data.id) {
+        this.logger.error('audio upload returned no Meta media ID');
+        return null;
+      }
+      return data.id;
+    } catch (err) {
+      this.logger.error(`audio upload error: ${(err as Error).message}`);
+      return null;
+    }
+  }
+
   private buildPayload(to: string, m: WhatsAppOutbound): any {
     const base = { messaging_product: 'whatsapp', to };
     switch (m.type) {
@@ -161,20 +204,28 @@ export class WhatsAppService {
           },
         };
       case 'template':
+        const components: any[] = [];
+        if (m.bodyParams?.length) {
+          components.push({
+            type: 'body',
+            parameters: m.bodyParams.map((t) => ({ type: 'text', text: t })),
+          });
+        }
+        m.quickReplyPayloads?.forEach((payload, index) => {
+          components.push({
+            type: 'button',
+            sub_type: 'quick_reply',
+            index: String(index),
+            parameters: [{ type: 'payload', payload }],
+          });
+        });
         return {
           ...base,
           type: 'template',
           template: {
             name: m.name,
             language: { code: m.language },
-            components: m.bodyParams?.length
-              ? [
-                  {
-                    type: 'body',
-                    parameters: m.bodyParams.map((t) => ({ type: 'text', text: t })),
-                  },
-                ]
-              : [],
+            components,
           },
         };
     }

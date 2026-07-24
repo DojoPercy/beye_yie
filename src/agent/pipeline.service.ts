@@ -12,6 +12,8 @@ import { RedFlagService } from './safety/red-flag.service';
 import { EscalationService } from './escalation/escalation.service';
 import { GroundedAgentService } from './grounded/grounded-agent.service';
 import { PersonalizationService } from './personalization/personalization.service';
+import { TipVoiceOfferService, parseTipVoiceReplyId } from './tips/tip-voice-offer.service';
+import { TipAudioAssetService } from '../whatsapp/tip-audio-asset.service';
 
 /**
  * The OT message pipeline (architecture plan §02). Every inbound message flows:
@@ -36,6 +38,8 @@ export class PipelineService {
     private readonly onboarding: OnboardingService,
     private readonly grounded: GroundedAgentService,
     private readonly personalization: PersonalizationService,
+    private readonly tipOffers: TipVoiceOfferService,
+    private readonly tipAudio: TipAudioAssetService,
     @InjectRepository(ConversationTurn)
     private readonly turns: Repository<ConversationTurn>,
   ) {}
@@ -80,6 +84,14 @@ export class PipelineService {
       return this.reply(worker, inbound, messages, 'check_in', fromVoice);
     }
 
+    // 2c — a fixed-tip voice offer. This must run before the onboarding state
+    // machine, otherwise "No thanks" would be mistaken for a tip-time reply.
+    const tipVoiceAction = parseTipVoiceReplyId(replyId);
+    if (tipVoiceAction) {
+      const messages = await this.handleTipVoiceAction(worker, tipVoiceAction);
+      return this.reply(worker, inbound, messages, 'onboarding', fromVoice);
+    }
+
     // 3 — onboarding.
     if (this.onboarding.isOnboarding(worker)) {
       const messages = await this.onboarding.handle(worker, inbound);
@@ -112,6 +124,34 @@ export class PipelineService {
       body = lang === 'tw' ? `Ɛyɛ anigye! Kɔ so yɛ. 💪` : `That's great to hear! Keep it up. 💪`;
     }
     return [{ type: 'text', body }];
+  }
+
+  private async handleTipVoiceAction(
+    worker: Worker,
+    action: ReturnType<typeof parseTipVoiceReplyId> extends infer T ? Exclude<T, null> : never,
+  ): Promise<WhatsAppOutbound[]> {
+    const tip = await this.tipOffers.findById(action.tipId);
+    if (!tip || action.language !== worker.language) {
+      return worker.language === 'tw'
+        ? [{ type: 'text', body: 'Yɛantumi anhu afotu no. Mesrɛ wo, kɔ so paw bere a wopɛ sɛ yɛde afotu brɛ wo.' }]
+        : [{ type: 'text', body: "I couldn't find that tip. Please choose when you want your daily tip." }];
+    }
+
+    const next = await this.onboarding.continueAfterFirstTipOffer(worker);
+    if (action.kind === 'skip') {
+      const acknowledgement =
+        worker.language === 'tw' ? 'Dabi, meda wo ase. 💚' : 'No problem. 💚';
+      return [{ type: 'text', body: acknowledgement }, ...next];
+    }
+
+    const mediaId = await this.tipAudio.ensureMediaId(tip, worker.language);
+    if (mediaId) return [{ type: 'audio', mediaId }, ...next];
+
+    const fallback =
+      worker.language === 'tw'
+        ? 'Voice afotu no nni hɔ seesei, nanso wubetumi akenkan afotu no wɔ atifi.'
+        : 'The voice tip is not ready yet, but you can read the tip above.';
+    return [{ type: 'text', body: fallback }, ...next];
   }
 
   private voiceUnavailable(worker: Worker): WhatsAppOutbound[] {

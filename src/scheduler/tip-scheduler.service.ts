@@ -7,6 +7,7 @@ import { WorkerService } from '../agent/worker/worker.service';
 import { PersonalizationService } from '../agent/personalization/personalization.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { WhatsAppOutbound } from '../whatsapp/whatsapp.types';
+import { TipVoiceOfferService } from '../agent/tips/tip-voice-offer.service';
 
 /**
  * Layer ① — the periodic push. Every few minutes, send the daily tip to any
@@ -27,6 +28,7 @@ export class TipSchedulerService {
     private readonly workers: WorkerService,
     private readonly personalization: PersonalizationService,
     private readonly whatsapp: WhatsAppService,
+    private readonly tipOffers: TipVoiceOfferService,
   ) {}
 
   /** Sweeps every 5 minutes; each worker fires once at their tip_time. */
@@ -75,6 +77,12 @@ export class TipSchedulerService {
   }
 
   private buildTipMessages(worker: Worker, tip: Tip): WhatsAppOutbound[] {
+    // The approved utility template is the production path. It carries a
+    // Play button; the audio is generated/uploaded only if the worker asks.
+    if (this.config.get<string>(`tipVoiceOfferTemplate.${worker.language}`)) {
+      return this.tipOffers.buildOffer(worker, tip);
+    }
+
     const messages: WhatsAppOutbound[] = [];
 
     if (tip.templateName) {
@@ -92,6 +100,14 @@ export class TipSchedulerService {
     }
 
     // Attach audio if a public base URL is configured for the recorded files.
+    const mediaId = worker.language === 'tw' ? tip.audioTwMediaId : tip.audioEnMediaId;
+    if (mediaId) {
+      messages.push({ type: 'audio', mediaId });
+      return messages;
+    }
+
+    // Legacy development fallback for manually hosted recordings. New assets
+    // are uploaded with TipAudioAssetService and use the Meta media ID above.
     const base = this.config.get<string>('AUDIO_BASE_URL') || process.env.AUDIO_BASE_URL;
     const file = worker.language === 'tw' ? tip.audioTwUrl : tip.audioEnUrl;
     if (base && file) {

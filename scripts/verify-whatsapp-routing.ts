@@ -74,6 +74,15 @@ const linkedAudioPayload = (service as any).buildPayload('233201234567', {
 check('uses a Meta media ID for a pre-uploaded audio asset', metaAudioPayload.audio?.id === 'meta-media-id');
 check('uses a public link only when no Meta media ID is supplied', linkedAudioPayload.audio?.link === 'https://cdn.example.com/welcome.ogg');
 
+const templatePayload = (service as any).buildPayload('233201234567', {
+  type: 'template',
+  name: 'daily_prevention_tip_voice_offer_en',
+  language: 'en',
+  bodyParams: ['Ama', 'Bend your knees.'],
+  quickReplyPayloads: ['tip_voice_play:L1:en', 'tip_voice_skip:L1:en'],
+});
+check('sends quick-reply payloads with a voice-offer template', templatePayload.template.components?.[1]?.parameters?.[0]?.payload === 'tip_voice_play:L1:en');
+
 console.log('\n[4] Meta webhook authentication:');
 const rawBody = Buffer.from(JSON.stringify(payload));
 const signature = `sha256=${createHmac('sha256', appSecret).update(rawBody).digest('hex')}`;

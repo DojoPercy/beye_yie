@@ -40,6 +40,11 @@ export interface AppConfig {
     en?: { mediaId?: string; link?: string };
     tw?: { mediaId?: string; link?: string };
   };
+  /** Approved Meta templates that offer a generated voice version of a tip. */
+  tipVoiceOfferTemplate: {
+    en?: string;
+    tw?: string;
+  };
   handoff: {
     name: string;
     contact: string;
@@ -97,6 +102,10 @@ export default (): AppConfig => ({
       mediaId: process.env.WELCOME_AUDIO_TW_MEDIA_ID,
       link: process.env.WELCOME_AUDIO_TW_URL,
     },
+  },
+  tipVoiceOfferTemplate: {
+    en: process.env.TIP_VOICE_OFFER_TEMPLATE_EN,
+    tw: process.env.TIP_VOICE_OFFER_TEMPLATE_TW,
   },
   handoff: {
     name: process.env.OT_HANDOFF_NAME || 'Ghana Health Service',

@@ -4,6 +4,7 @@ import { AppConfig } from '../../config/configuration';
 import { Category, Language, WorkActivity, Worker } from '../../database/entities/worker.entity';
 import { NormalizedInbound, WhatsAppOutbound } from '../../whatsapp/whatsapp.types';
 import { WorkerService } from '../worker/worker.service';
+import { TipVoiceOfferService } from '../tips/tip-voice-offer.service';
 
 /**
  * Onboarding quiz (content pack §8). A small state machine over numbered
@@ -17,6 +18,7 @@ export class OnboardingService {
   constructor(
     private readonly workers: WorkerService,
     private readonly config: ConfigService<AppConfig>,
+    private readonly tipOffers: TipVoiceOfferService,
   ) {}
 
   isOnboarding(worker: Worker): boolean {
@@ -60,9 +62,20 @@ export class OnboardingService {
         if (!activity) return [this.askWorkActivity(worker.language, worker.name)];
         worker.workActivity = activity;
         worker.category = this.categoryForActivity(activity);
-        worker.onboardingStep = 'tiptime';
+        const firstTip = await this.tipOffers.firstFor(worker);
+        worker.onboardingStep = firstTip ? 'first_tip_offer' : 'tiptime';
         await this.workers.save(worker);
-        return [this.askTipTime(worker.language)];
+        return firstTip ? this.tipOffers.buildOffer(worker, firstTip) : [this.askTipTime(worker.language)];
+      }
+
+      case 'first_tip_offer': {
+        // Button replies are handled before onboarding in PipelineService so
+        // the selected voice asset can be generated and sent. Do not silently
+        // set a default time when a worker has not made that choice yet.
+        const tip = await this.tipOffers.firstFor(worker);
+        return tip
+          ? this.tipOffers.buildOffer(worker, tip)
+          : [this.askTipTime(worker.language)];
       }
 
       case 'tiptime': {
@@ -164,6 +177,14 @@ export class OnboardingService {
         { id: 'time_1900', title: lang === 'tw' ? 'Anwummerɛ 7' : 'Evening 7:00' },
       ],
     };
+  }
+
+  /** Complete the voice-offer stage only after Play or No thanks is chosen. */
+  async continueAfterFirstTipOffer(worker: Worker): Promise<WhatsAppOutbound[]> {
+    if (worker.onboardingStep !== 'first_tip_offer') return [];
+    worker.onboardingStep = 'tiptime';
+    await this.workers.save(worker);
+    return [this.askTipTime(worker.language)];
   }
 
   private finish(worker: Worker): WhatsAppOutbound[] {

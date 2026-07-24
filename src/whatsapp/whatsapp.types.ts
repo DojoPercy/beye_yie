@@ -7,7 +7,14 @@ export type WhatsAppOutbound =
   | { type: 'audio'; link: string; mediaId?: never }
   | { type: 'buttons'; body: string; buttons: { id: string; title: string }[] }
   | { type: 'list'; body: string; button: string; rows: { id: string; title: string; description?: string }[] }
-  | { type: 'template'; name: string; language: string; bodyParams?: string[] };
+  | {
+      type: 'template';
+      name: string;
+      language: string;
+      bodyParams?: string[];
+      /** Per-button payloads for an approved template's quick-reply buttons. */
+      quickReplyPayloads?: string[];
+    };
 
 /** A normalized inbound message after we flatten Meta's webhook envelope. */
 export interface NormalizedInbound {

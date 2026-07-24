@@ -23,6 +23,8 @@ import { spawn } from 'child_process';
 export interface SynthesizeResult {
   /** Relative path, e.g. /audio/tts_xxx.ogg */
   url: string;
+  /** Absolute local file path for a trusted caller that must upload to Meta. */
+  filePath: string;
   /** Absolute URL (only set if `abenaTts.publicBaseUrl` is configured) — use this for WhatsApp media payloads */
   absoluteUrl: string | null;
   mimeType: 'audio/ogg; codecs=opus';
@@ -420,6 +422,7 @@ export class AbenaTTSService {
     const baseUrl = this.config.get<string>('abenaTts.publicBaseUrl');
     return {
       url: relativeUrl,
+      filePath: this.oggPath(cacheKey),
       absoluteUrl: baseUrl ? new URL(relativeUrl, baseUrl).toString() : null,
       mimeType: 'audio/ogg; codecs=opus',
       durationSeconds,

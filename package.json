@@ -18,6 +18,8 @@
     "verify:whatsapp-routing": "ts-node -r tsconfig-paths/register scripts/verify-whatsapp-routing.ts",
     "verify:welcome-audio": "ts-node -r tsconfig-paths/register scripts/verify-welcome-audio.ts",
     "generate:welcome-audio": "ts-node -r tsconfig-paths/register scripts/generate-welcome-audio.ts",
+    "prepare:tip-audio": "ts-node -r tsconfig-paths/register scripts/prepare-tip-audio.ts",
+    "verify:tip-voice-offer": "ts-node -r tsconfig-paths/register scripts/verify-tip-voice-offer.ts",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix"
   },
   "dependencies": {
