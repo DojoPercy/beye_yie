@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { AppConfig } from '../../config/configuration';
@@ -31,10 +31,28 @@ Reply with ONLY a compact JSON object: {"redFlag": true|false, "reason": "<short
  * backstop for phrasings the keywords miss. Either one firing = red flag.
  */
 @Injectable()
-export class RedFlagService {
+export class RedFlagService implements OnModuleInit {
   private readonly logger = new Logger(RedFlagService.name);
 
   constructor(private readonly config: ConfigService) {}
+
+  /**
+   * Announce the gate's real capability at boot. Without a model the gate is
+   * keyword-only, which for a Twi-first audience is a materially weaker safety
+   * net — that must never be a silent condition in production.
+   */
+  onModuleInit(): void {
+    const llm = this.config.get<AppConfig['llm']>('llm')!;
+    if (llmConfigured(llm)) {
+      this.logger.log('safety gate: deterministic rules + LLM backstop active');
+      return;
+    }
+    this.logger.error(
+      'SAFETY GATE DEGRADED — no LLM configured, so red-flag detection is keyword-only. ' +
+        'Twi and Pidgin phrasings outside the keyword list will NOT be caught. ' +
+        'Set an LLM provider key before running a pilot with real workers.',
+    );
+  }
 
   async check(message: string): Promise<RedFlagResult> {
     if (!message?.trim()) return { isRedFlag: false, reason: '', source: 'none' };

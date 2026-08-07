@@ -6,6 +6,9 @@ import { RedFlagReferral } from './red-flag-referral.entity';
 import { TipDelivery } from './tip-delivery.entity';
 import { ConversationTurn } from './conversation-turn.entity';
 import { ProcessedMessage } from './processed-message.entity';
+import { Assessment } from './assessment.entity';
+import { DailyCheckIn } from './daily-check-in.entity';
+import { FunctionScore } from './function-score.entity';
 
 export const ENTITIES = [
   Worker,
@@ -16,6 +19,9 @@ export const ENTITIES = [
   TipDelivery,
   ConversationTurn,
   ProcessedMessage,
+  Assessment,
+  DailyCheckIn,
+  FunctionScore,
 ];
 
 export {
@@ -27,4 +33,7 @@ export {
   TipDelivery,
   ConversationTurn,
   ProcessedMessage,
+  Assessment,
+  DailyCheckIn,
+  FunctionScore,
 };

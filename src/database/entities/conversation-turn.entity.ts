@@ -1,6 +1,13 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-export type TurnLayer = 'onboarding' | 'on_demand' | 'escalation' | 'check_in' | 'periodic';
+export type TurnLayer =
+  | 'onboarding'
+  | 'assessment'
+  | 'on_demand'
+  | 'escalation'
+  | 'check_in'
+  | 'daily_check_in'
+  | 'periodic';
 
 /**
  * Lightweight audit of every inbound→outbound exchange. Distinct from the
