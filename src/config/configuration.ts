@@ -45,6 +45,20 @@ export interface AppConfig {
     en?: string;
     tw?: string;
   };
+  /**
+   * Approved template that opens the daily check-in. Its quick-reply button
+   * must carry the `dci_start` payload. Without it the check-in can only be
+   * sent inside an open 24h window (dev and reply-driven use).
+   */
+  dailyCheckInTemplate: {
+    en?: string;
+    tw?: string;
+  };
+  /** Approved template that delivers the weekly summary. */
+  weeklySummaryTemplate: {
+    en?: string;
+    tw?: string;
+  };
   handoff: {
     name: string;
     contact: string;
@@ -55,6 +69,10 @@ export interface AppConfig {
     tipsEnabled: boolean;
     /** Weekly proactive check-in. Also template-gated. */
     checkInsEnabled: boolean;
+    /** Daily check-in prompt (spec §3). Template-gated. */
+    dailyCheckInsEnabled: boolean;
+    /** Weekly per-worker health summary (spec §8). Template-gated. */
+    weeklySummaryEnabled: boolean;
   };
 }
 
@@ -107,6 +125,14 @@ export default (): AppConfig => ({
     en: process.env.TIP_VOICE_OFFER_TEMPLATE_EN,
     tw: process.env.TIP_VOICE_OFFER_TEMPLATE_TW,
   },
+  dailyCheckInTemplate: {
+    en: process.env.DAILY_CHECKIN_TEMPLATE_EN,
+    tw: process.env.DAILY_CHECKIN_TEMPLATE_TW,
+  },
+  weeklySummaryTemplate: {
+    en: process.env.WEEKLY_SUMMARY_TEMPLATE_EN,
+    tw: process.env.WEEKLY_SUMMARY_TEMPLATE_TW,
+  },
   handoff: {
     name: process.env.OT_HANDOFF_NAME || 'Ghana Health Service',
     contact: process.env.OT_HANDOFF_CONTACT || '+233-000-000-000',
@@ -116,5 +142,7 @@ export default (): AppConfig => ({
     // Default OFF: proactive messages need approved WhatsApp templates.
     tipsEnabled: process.env.TIP_SCHEDULER_ENABLED === 'true',
     checkInsEnabled: process.env.WEEKLY_CHECKIN_ENABLED === 'true',
+    dailyCheckInsEnabled: process.env.DAILY_CHECKIN_ENABLED === 'true',
+    weeklySummaryEnabled: process.env.WEEKLY_SUMMARY_ENABLED === 'true',
   },
 });

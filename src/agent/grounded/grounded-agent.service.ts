@@ -10,6 +10,7 @@ import { createChatModel, llmConfigured } from '../llm/chat-model.factory';
 import { matchTopics } from '../knowledge/knowledge-base';
 import { matchPhrase } from '../knowledge/phrase-map';
 import { PersonalizationService } from '../personalization/personalization.service';
+import { parseNrs } from '../scoring/nrs';
 import { buildGroundedPrompt, fallbackReply } from './prompts';
 
 export interface GroundedResult {
@@ -48,7 +49,7 @@ export class GroundedAgentService {
         phrase.bodyPart,
         phrase.category,
         phrase.tipId,
-        this.parseNrs(message),
+        parseNrs(message),
       );
     }
 
@@ -121,13 +122,5 @@ export class GroundedAgentService {
       if (t.outbound) msgs.push(new AIMessage(t.outbound));
     }
     return msgs;
-  }
-
-  /** Extract an explicit 0–10 pain score if the worker stated one. */
-  private parseNrs(message: string): number | null {
-    const m = message.match(/\b(10|[0-9])\s*(?:\/\s*10|out of 10)?\b/);
-    if (!m) return null;
-    const n = Number(m[1]);
-    return n >= 0 && n <= 10 ? n : null;
   }
 }

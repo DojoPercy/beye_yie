@@ -1,17 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../../config/configuration';
-import { Category, Language, WorkActivity, Worker } from '../../database/entities/worker.entity';
+import { Category, GoodsType, Language, WorkActivity, Worker } from '../../database/entities/worker.entity';
 import { NormalizedInbound, WhatsAppOutbound } from '../../whatsapp/whatsapp.types';
 import { WorkerService } from '../worker/worker.service';
 import { TipVoiceOfferService } from '../tips/tip-voice-offer.service';
 
 /**
- * Onboarding quiz (content pack §8). A small state machine over numbered
- * button/list menus so low-literacy workers can just tap a reply:
- *   start → language → name → main work activity → tip time → done
+ * Onboarding quiz (content pack §8, spec §1). A small state machine over
+ * numbered button/list menus so low-literacy workers can just tap a reply:
+ *
+ *   start → language → name → age → goods → market → hours
+ *         → main work activity → first tip offer → tip time → done
  *
  * Kept deterministic (no LLM) so it is cheap, predictable, and works offline.
+ *
+ * The four profile questions are all skippable. Registration detail is worth
+ * having, but not at the cost of a worker abandoning the flow before she has
+ * the safety gate and the daily tips — the parts that actually protect her.
  */
 @Injectable()
 export class OnboardingService {
@@ -49,6 +55,35 @@ export class OnboardingService {
       case 'name': {
         const name = inbound.text.trim();
         if (name && !inbound.replyId) worker.name = name.slice(0, 40);
+        worker.onboardingStep = 'age';
+        await this.workers.save(worker);
+        return [this.askAge(worker.language)];
+      }
+
+      case 'age': {
+        worker.age = this.parseAge(inbound.text);
+        worker.onboardingStep = 'goods';
+        await this.workers.save(worker);
+        return [this.askGoods(worker.language)];
+      }
+
+      case 'goods': {
+        worker.goodsSold = this.parseGoods(choice);
+        worker.onboardingStep = 'market';
+        await this.workers.save(worker);
+        return [this.askMarket(worker.language)];
+      }
+
+      case 'market': {
+        const market = inbound.text.trim();
+        worker.marketLocation = this.isSkip(market) ? null : market.slice(0, 80) || null;
+        worker.onboardingStep = 'hours';
+        await this.workers.save(worker);
+        return [this.askHours(worker.language)];
+      }
+
+      case 'hours': {
+        worker.avgWorkHours = this.parseHours(choice);
         worker.onboardingStep = 'work_activity';
         await this.workers.save(worker);
         return [this.askWorkActivity(worker.language, worker.name)];
@@ -144,6 +179,60 @@ export class OnboardingService {
     };
   }
 
+  private askAge(lang: Language): WhatsAppOutbound {
+    return {
+      type: 'text',
+      body:
+        lang === 'tw'
+          ? 'Wadi mfe ahe? (Kyerɛw nɔmba no. Sɛ wompɛ sɛ woka a, kyerɛw "skip".)'
+          : 'How old are you? (Type the number, or type "skip".)',
+    };
+  }
+
+  private askGoods(lang: Language): WhatsAppOutbound {
+    return {
+      type: 'list',
+      body: lang === 'tw' ? 'Nneɛma bɛn na wotɔn?' : 'What do you sell?',
+      button: lang === 'tw' ? 'Paw' : 'Choose',
+      rows: [
+        { id: 'goods_produce', title: lang === 'tw' ? 'Nhabamma / nnuaba' : 'Vegetables or fruit', description: 'Tomatoes, pepper, plantain, fruit' },
+        { id: 'goods_grains', title: lang === 'tw' ? 'Aburow / adua' : 'Grains, beans or rice', description: 'Maize, rice, beans, gari' },
+        { id: 'goods_fish_meat', title: lang === 'tw' ? 'Nam / nsuomnam' : 'Fish or meat', description: 'Fresh, smoked, or frozen' },
+        { id: 'goods_cooked_food', title: lang === 'tw' ? 'Aduan a wɔanoa' : 'Cooked food', description: 'Chop bar, waakye, kenkey, drinks' },
+        { id: 'goods_provisions', title: lang === 'tw' ? 'Provisions' : 'Provisions', description: 'Sachets, tins, soap, small items' },
+        { id: 'goods_clothing', title: lang === 'tw' ? 'Ntama / ntade' : 'Clothing or textiles', description: 'Cloth, second-hand clothes, shoes' },
+        { id: 'goods_hardware', title: lang === 'tw' ? 'Efie nneɛma' : 'Hardware or household goods', description: 'Buckets, pots, tools, charcoal' },
+        { id: 'goods_other', title: lang === 'tw' ? 'Foforɔ' : 'Something else', description: 'Anything not listed here' },
+        { id: 'goods_skip', title: lang === 'tw' ? 'Mempɛ sɛ meka' : 'Rather not say', description: 'Skip this question' },
+      ],
+    };
+  }
+
+  private askMarket(lang: Language): WhatsAppOutbound {
+    return {
+      type: 'text',
+      body:
+        lang === 'tw'
+          ? 'Dwam bɛn na wotɔn wɔ hɔ? (Kyerɛw dwam no din, anaa "skip".)'
+          : 'Which market do you work in? (Type the name, or type "skip".)',
+    };
+  }
+
+  private askHours(lang: Language): WhatsAppOutbound {
+    return {
+      type: 'buttons',
+      body:
+        lang === 'tw'
+          ? 'Da biara, nnɔnhwerew ahe na woyɛ adwuma?'
+          : 'On a normal day, how many hours do you work?',
+      buttons: [
+        { id: 'hours_short', title: lang === 'tw' ? 'Bɛyɛ 6' : 'About 6' },
+        { id: 'hours_medium', title: lang === 'tw' ? 'Bɛyɛ 10' : 'About 10' },
+        { id: 'hours_long', title: lang === 'tw' ? '12 anaa boro' : '12 or more' },
+      ],
+    };
+  }
+
   private askWorkActivity(lang: Language, name: string | null): WhatsAppOutbound {
     const hi = name ? `${name}, ` : '';
     return {
@@ -197,6 +286,54 @@ export class OnboardingService {
   }
 
   // ── Parsers ──
+
+  /** Any of the ways a worker signals she'd rather not answer. */
+  private isSkip(text: string): boolean {
+    return /^(skip|no|dabi|pass|-|\.)$/i.test(text.trim());
+  }
+
+  /**
+   * Age, or null when skipped or implausible. Out-of-range numbers are more
+   * likely a mistyped year or a phone number than a real age.
+   */
+  private parseAge(text: string): number | null {
+    if (this.isSkip(text)) return null;
+    const m = text.match(/\b(\d{1,3})\b/);
+    if (!m) return null;
+    const age = Number(m[1]);
+    return age >= 12 && age <= 100 ? age : null;
+  }
+
+  private parseGoods(choice: string): GoodsType | null {
+    const c = choice.toLowerCase();
+    if (c === 'goods_skip' || this.isSkip(c)) return null;
+    if (c === 'goods_produce' || /veget|fruit|nhabamma|nnuaba|tomato|pepper|plantain/.test(c)) return 'produce';
+    if (c === 'goods_grains' || /grain|rice|bean|maize|aburow|adua|gari/.test(c)) return 'grains';
+    if (c === 'goods_fish_meat' || /fish|meat|nam/.test(c)) return 'fish_meat';
+    if (c === 'goods_cooked_food' || /cook|food|chop|waakye|kenkey|aduan/.test(c)) return 'cooked_food';
+    if (c === 'goods_provisions' || /provision|sachet|soap/.test(c)) return 'provisions';
+    if (c === 'goods_clothing' || /cloth|textile|ntama|ntade|shoe/.test(c)) return 'clothing_textiles';
+    if (c === 'goods_hardware' || /hardware|household|bucket|pot|tool|charcoal|efie/.test(c)) return 'hardware_household';
+    if (c === 'goods_other' || /other|foforo/.test(c)) return 'other';
+    return null;
+  }
+
+  /**
+   * Average hours per day. Menu choices store the band midpoint; a worker who
+   * types a number instead has it taken at face value.
+   */
+  private parseHours(choice: string): number | null {
+    const c = choice.toLowerCase();
+    if (c === 'hours_short') return 6;
+    if (c === 'hours_medium') return 10;
+    if (c === 'hours_long') return 13;
+    if (this.isSkip(c)) return null;
+    const m = c.match(/\b(\d{1,2})\b/);
+    if (!m) return null;
+    const hours = Number(m[1]);
+    return hours >= 1 && hours <= 24 ? hours : null;
+  }
+
   private parseLanguage(choice: string): Language | null {
     const c = choice.toLowerCase();
     if (c === 'lang_tw' || c.includes('twi') || c === '1') return 'tw';
