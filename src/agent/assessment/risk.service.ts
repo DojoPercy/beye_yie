@@ -24,9 +24,9 @@ export interface RiskOutcome {
 @Injectable()
 export class RiskService {
   /** Pain at or above this is treated as high severity. */
-  private static readonly HIGH_NRS = 7;
+  static readonly HIGH_NRS = 7;
   /** Pain at or above this (but below HIGH_NRS) is moderate. */
-  private static readonly MODERATE_NRS = 4;
+  static readonly MODERATE_NRS = 4;
   /** A working day this long is itself a risk factor when pain is present. */
   private static readonly LONG_WORKDAY_HOURS = 12;
 

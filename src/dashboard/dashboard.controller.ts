@@ -18,4 +18,10 @@ export class DashboardController {
   callbacks() {
     return this.dashboard.callbacks();
   }
+
+  /** Ranked follow-up list: every open distress signal, not just callbacks. */
+  @Get('outreach')
+  outreach() {
+    return this.dashboard.outreach();
+  }
 }
