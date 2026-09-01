@@ -251,7 +251,9 @@ export class DashboardService {
         : null;
 
       if (!worker) {
-        add('high', 'Flagged before she finished signing up — no profile on record');
+        // The missing profile is context for whoever makes the call, never a
+        // reason to call: it only rides along once a real signal has fired.
+        if (reasons.length) add('watch', 'No profile on record — flagged before she finished signing up');
       } else if (worker.onboarded) {
         if (daysSinceContact !== null && daysSinceContact >= QUIET_DAYS) {
           add('watch', `Silent for ${daysSinceContact} days`, lastContactAt);
