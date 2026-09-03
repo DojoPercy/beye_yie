@@ -417,15 +417,11 @@
         }).join('') + '</tbody></table>';
     }
 
-    /* Tip engagement — honest empty state while the push is gated */
+    /* Tip engagement — the reason for an empty state comes from live config */
     const card = $('tips-card');
-    if (!eng.tipsSent) {
-      card.innerHTML =
-        '<h3>Daily tips are not yet sending</h3>' +
-        '<p class="note" style="margin-bottom:0">The scheduled morning tip is gated behind WhatsApp utility-template approval. ' +
-        'The content — nine OT-authored tips in English and Twi, each with a voice note — is built, seeded and ready; ' +
-        'engagement metrics populate here from the first send.</p>';
-    } else {
+    const ready = eng.readiness || {};
+    const templates = ready.templates || {};
+    if (eng.tipsSent) {
       card.innerHTML =
         '<h3>Daily tips</h3><p class="note">Delivery and reply rate across the nine OT-authored tips.</p>' +
         '<div class="kpis" style="grid-template-columns:repeat(3,1fr)">' +
@@ -433,6 +429,20 @@
           '<div class="kpi"><div class="label"><span class="chip good"></span>Replied to</div><div class="value">' + num(eng.tipsOpened) + '</div></div>' +
           '<div class="kpi"><div class="label"><span class="chip warn"></span>Engagement rate</div><div class="value">' + Math.round((eng.openRate || 0) * 100) + '%</div></div>' +
         '</div>';
+    } else {
+      // Name the one thing actually standing in the way, checked in send order.
+      const blockers = [];
+      if (!ready.schedulerEnabled) blockers.push('the morning push is switched off (<code>TIP_SCHEDULER_ENABLED</code>)');
+      if (!templates.en && !templates.tw) blockers.push('no approved WhatsApp template is configured');
+      else if (!templates.en || !templates.tw) blockers.push('only the ' + (templates.en ? 'English' : 'Twi') + ' template is configured');
+      if (!ready.eligibleWorkers) blockers.push('no woman has yet completed onboarding with verified inbound consent');
+
+      card.innerHTML = blockers.length
+        ? '<h3>Daily tips have not started</h3><p class="note" style="margin-bottom:0">Nine OT-authored tips in English and Twi are seeded and ready. Still outstanding: ' +
+            blockers.join('; ') + '. Engagement metrics appear here from the first send.</p>'
+        : '<h3>Armed and waiting for the first send</h3><p class="note" style="margin-bottom:0">Templates are approved and the scheduler is on. ' +
+            '<strong>' + num(ready.eligibleWorkers) + '</strong> ' + (ready.eligibleWorkers === 1 ? 'woman is' : 'women are') +
+            ' eligible; each receives her tip at the time she chose, and the sweep runs every 5 minutes. Metrics appear here from the first delivery.</p>';
     }
 
     const n = reach.totalWorkers || 0;
@@ -447,6 +457,18 @@
     return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  /* Opened straight off disk: there is no origin to fetch the API from. */
+  function offline() {
+    $('live-dot').className = 'dot down';
+    $('live-text').textContent = 'Not connected';
+    $('error-slot').innerHTML =
+      '<div class="err" style="margin-bottom:26px"><b>Open this page over http, not from the file system.</b><br>' +
+      'A <code>file://</code> page has no origin, so the browser blocks its request to the API — that is the CORS error you are seeing. ' +
+      'Nothing is wrong with the dashboard.<br><br>' +
+      'Live: <b><a href="https://beye-yie.onrender.com/impact.html" style="color:var(--series-1)">beye-yie.onrender.com/impact.html</a></b><br>' +
+      'Local: run <code>npm run start:dev</code>, then open <code>http://localhost:3005/impact.html</code> — the API serves this file itself, so there is no cross-origin request to block.</div>';
+  }
+
   function fail(err) {
     $('live-dot').className = 'dot down';
     $('live-text').textContent = 'Could not reach the service';
@@ -457,6 +479,7 @@
   }
 
   async function load() {
+    if (location.protocol === 'file:') return offline();
     try {
       const [summary, outreach] = await Promise.all([
         fetch('/dashboard/summary', { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),

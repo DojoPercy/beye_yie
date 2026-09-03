@@ -1,16 +1,16 @@
 {
   "name": "beye-yie-ghana",
   "version": "0.1.0",
-  "description": "Bɛyɛ Yie Ghana — preventive occupational-therapy WhatsApp companion for market women and manual workers",
+  "description": "B\u025by\u025b Yie Ghana \u2014 preventive occupational-therapy WhatsApp companion for market women and manual workers",
   "author": "Ordaro",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "node init && nest build",
     "format": "prettier --write \"src/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:prod": "node dist/main",
+    "start": "node init && nest start",
+    "start:dev": "node init && nest start --watch",
+    "start:prod": "node init && node dist/main",
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:run": "npm run typeorm -- migration:run",
     "seed:tips": "ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
@@ -20,7 +20,8 @@
     "generate:welcome-audio": "ts-node -r tsconfig-paths/register scripts/generate-welcome-audio.ts",
     "prepare:tip-audio": "ts-node -r tsconfig-paths/register scripts/prepare-tip-audio.ts",
     "verify:tip-voice-offer": "ts-node -r tsconfig-paths/register scripts/verify-tip-voice-offer.ts",
-    "lint": "eslint \"{src,test}/**/*.ts\" --fix"
+    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "tip:test": "ts-node -r tsconfig-paths/register scripts/send-test-tip.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.68",
@@ -34,6 +35,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "dotenv": "^17.2.1",
     "groq-sdk": "^1.3.0",
+    "node-fetch": "^3.3.2",
     "openai": "^6.45.0",
     "pg": "^8.22.0",
     "pg-boss": "^12.25.1",
