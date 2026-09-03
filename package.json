@@ -1,7 +1,7 @@
 {
   "name": "beye-yie-ghana",
   "version": "0.1.0",
-  "description": "Bɛyɛ Yie Ghana — preventive occupational-therapy WhatsApp companion for market women and manual workers",
+  "description": "B\u025by\u025b Yie Ghana \u2014 preventive occupational-therapy WhatsApp companion for market women and manual workers",
   "author": "Ordaro",
   "private": true,
   "license": "UNLICENSED",
@@ -20,7 +20,8 @@
     "generate:welcome-audio": "ts-node -r tsconfig-paths/register scripts/generate-welcome-audio.ts",
     "prepare:tip-audio": "ts-node -r tsconfig-paths/register scripts/prepare-tip-audio.ts",
     "verify:tip-voice-offer": "ts-node -r tsconfig-paths/register scripts/verify-tip-voice-offer.ts",
-    "lint": "eslint \"{src,test}/**/*.ts\" --fix"
+    "lint": "eslint \"{src,test}/**/*.ts\" --fix",
+    "tip:test": "ts-node -r tsconfig-paths/register scripts/send-test-tip.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.68",

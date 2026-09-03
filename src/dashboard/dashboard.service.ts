@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThanOrEqual, Repository } from 'typeorm';
 import { Worker } from '../database/entities/worker.entity';
@@ -10,6 +11,7 @@ import { Assessment } from '../database/entities/assessment.entity';
 import { DailyCheckIn } from '../database/entities/daily-check-in.entity';
 import { FunctionScore } from '../database/entities/function-score.entity';
 import { RiskService } from '../agent/assessment/risk.service';
+import { AppConfig } from '../config/configuration';
 
 /**
  * How urgently a human should make contact.
@@ -72,6 +74,7 @@ export class DashboardService {
     @InjectRepository(Assessment) private readonly assessments: Repository<Assessment>,
     @InjectRepository(DailyCheckIn) private readonly dailyCheckIns: Repository<DailyCheckIn>,
     @InjectRepository(FunctionScore) private readonly functionScores: Repository<FunctionScore>,
+    private readonly config: ConfigService<AppConfig>,
   ) {}
 
   async summary() {
@@ -104,6 +107,15 @@ export class DashboardService {
       .groupBy('c.value')
       .getRawMany();
 
+    // Why the daily tip has or hasn't gone out — read from live config rather
+    // than described in the page, so the dashboard cannot narrate a stale reason.
+    const templates = this.config.get('tipVoiceOfferTemplate', { infer: true });
+    const eligibleWorkers = await this.workers
+      .createQueryBuilder('w')
+      .where('w.onboarded = :onboarded', { onboarded: true })
+      .andWhere('w.lastVerifiedInboundAt IS NOT NULL')
+      .getCount();
+
     const redFlagsReferred = await this.referrals.count();
     const callbacksRequested = await this.referrals.count({ where: { callbackRequested: true } });
 
@@ -118,6 +130,13 @@ export class DashboardService {
         tipsSent,
         tipsOpened,
         openRate: tipsSent ? Number((tipsOpened / tipsSent).toFixed(2)) : 0,
+        /** Everything the morning push needs before it can send anything. */
+        readiness: {
+          schedulerEnabled: Boolean(this.config.get('scheduler', { infer: true })?.tipsEnabled),
+          templates: { en: Boolean(templates?.en), tw: Boolean(templates?.tw) },
+          /** Onboarded and with Meta-verified inbound consent — the send gate. */
+          eligibleWorkers,
+        },
       },
       health: {
         painByBodyPart: painByBodyPart.map((r) => ({ bodyPart: r.bodyPart, count: Number(r.count) })),

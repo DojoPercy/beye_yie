@@ -56,7 +56,12 @@ export class TipSchedulerService {
     }
   }
 
-  private async sendDailyTip(worker: Worker, today: string): Promise<void> {
+  /**
+   * Send today's tip to one worker, right now. The sweep calls this once her
+   * chosen time arrives; the manual trigger (scripts/send-test-tip.ts) calls it
+   * directly so a test send exercises this exact path rather than a copy.
+   */
+  async sendDailyTip(worker: Worker, today: string): Promise<void> {
     const tip = await this.personalization.pickDailyTip(worker);
     if (!tip) return;
 
